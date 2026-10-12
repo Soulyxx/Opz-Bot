@@ -1,4 +1,5 @@
 'use strict';
+
 const USE_PG = !!process.env.DATABASE_URL;
 let pool = null, sqlite = null;
 
@@ -14,26 +15,44 @@ const T = {
     id BIGSERIAL PRIMARY KEY, key TEXT, action TEXT, detail TEXT, at BIGINT)`
 };
 
+/* node:sqlite viene en Node >=22.5 (sin flag en Node 24). Sin binarios nativos. */
+function loadSqlite() {
+  try { return require('node:sqlite').DatabaseSync; }
+  catch {
+    try { return require('better-sqlite3'); }
+    catch { throw new Error('No sqlite driver. Usá Node >=22.5 o seteá DATABASE_URL.'); }
+  }
+}
+
 async function init() {
   if (USE_PG) {
     const { Pool } = require('pg');
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false } });
-    await pool.query(T.keys); await pool.query(T.sessions); await pool.query(T.logs);
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+      max: 5
+    });
+    await pool.query(T.keys);
+    await pool.query(T.sessions);
+    await pool.query(T.logs);
     console.log('[db] postgres ready');
   } else {
-    const Database = require('better-sqlite3');
-    sqlite = new Database(process.env.DB_FILE || 'auth.db');
-    sqlite.pragma('journal_mode = WAL');
-    sqlite.exec(T.keys.replace('BIGSERIAL PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT').replace(/BIGINT/g, 'INTEGER'));
-    sqlite.exec(T.sessions.replace(/BIGINT/g, 'INTEGER'));
-    sqlite.exec(T.logs.replace('BIGSERIAL PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT').replace(/BIGINT/g, 'INTEGER'));
+    const DatabaseSync = loadSqlite();
+    sqlite = new DatabaseSync(process.env.DB_FILE || 'auth.db');
+    try { sqlite.exec('PRAGMA journal_mode = WAL'); } catch {}
+    sqlite.exec(T.keys.replace('BIGSERIAL PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT'));
+    sqlite.exec(T.sessions);
+    sqlite.exec(T.logs.replace('BIGSERIAL PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT'));
     console.log('[db] sqlite ready (local)');
   }
 }
 
 const toPg = (sql) => { let i = 0; return sql.replace(/\?/g, () => '$' + (++i)); };
 const num = (v) => (v == null ? v : Number(v));
-const clean = (r) => { if (r) { r.expires_at = num(r.expires_at); r.created_at = num(r.created_at); r.last_seen = num(r.last_seen); } return r; };
+const clean = (r) => {
+  if (r) { r.expires_at = num(r.expires_at); r.created_at = num(r.created_at); r.last_seen = num(r.last_seen); }
+  return r;
+};
 
 const run = (sql, p = []) => (USE_PG ? pool.query(toPg(sql), p) : sqlite.prepare(sql).run(...p));
 const all = async (sql, p = []) => (USE_PG ? (await pool.query(toPg(sql), p)).rows : sqlite.prepare(sql).all(...p));
@@ -71,7 +90,8 @@ const dropSession = (t) => run('DELETE FROM sessions WHERE token = ?', [t]);
 const dropKeySessions = (k) => run('DELETE FROM sessions WHERE key = ?', [k]);
 const purgeSessions = () => run('DELETE FROM sessions WHERE expires_at < ?', [Date.now()]);
 
-const log = (key, action, detail = '') => run('INSERT INTO logs (key,action,detail,at) VALUES (?,?,?,?)', [key, action, String(detail), Date.now()]);
+const log = (key, action, detail = '') =>
+  run('INSERT INTO logs (key,action,detail,at) VALUES (?,?,?,?)', [key, action, String(detail), Date.now()]);
 
 module.exports = {
   init, getKey, insertKey, updateKey, deleteKey, bump, listKeys, stats,
