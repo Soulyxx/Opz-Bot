@@ -1,6 +1,6 @@
 {
   "name": "lost-optimizations-auth",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "main": "src/index.js",
   "scripts": { "start": "node src/index.js" },
@@ -8,8 +8,7 @@
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "pg": "^8.13.1",
-    "better-sqlite3": "^11.5.0"
+    "pg": "^8.13.1"
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=22.5" }
 }
