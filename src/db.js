@@ -15,12 +15,12 @@ const T = {
     id BIGSERIAL PRIMARY KEY, key TEXT, action TEXT, detail TEXT, at BIGINT)`
 };
 
-/* node:sqlite viene en Node >=22.5 (sin flag en Node 24). Sin binarios nativos. */
+/* Driver sqlite sin binarios nativos: node:sqlite (Node >=22.5) o better-sqlite3. */
 function loadSqlite() {
   try { return require('node:sqlite').DatabaseSync; }
   catch {
     try { return require('better-sqlite3'); }
-    catch { throw new Error('No sqlite driver. Usá Node >=22.5 o seteá DATABASE_URL.'); }
+    catch { throw new Error('No sqlite driver available. Use Node >=22.5, install better-sqlite3, or set DATABASE_URL.'); }
   }
 }
 
@@ -54,6 +54,8 @@ const clean = (r) => {
   return r;
 };
 
+/* Ambos drivers (node:sqlite y better-sqlite3) aceptan `.prepare().run/get/all`
+   con argumentos posicionales via spread. No envolver en array. */
 const run = (sql, p = []) => (USE_PG ? pool.query(toPg(sql), p) : sqlite.prepare(sql).run(...p));
 const all = async (sql, p = []) => (USE_PG ? (await pool.query(toPg(sql), p)).rows : sqlite.prepare(sql).all(...p));
 const get = async (sql, p = []) => (USE_PG ? (await pool.query(toPg(sql), p)).rows[0] : sqlite.prepare(sql).get(...p));

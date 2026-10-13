@@ -15,4 +15,20 @@ function parseDuration(str) {
   return parseInt(m[1], 10) * mult;
 }
 const PLANS = { trial: 1, week: 7, month: 30, lifetime: null };
-module.exports = { gen, token, normalize, parseDuration, PLANS };
+
+/* Duracion de un plan en ms; lifetime => null (sin expiracion), no 0. */
+function planMs(plan) {
+  const d = PLANS[plan];
+  if (d == null) return null;   // lifetime
+  return d * 864e5;
+}
+
+function parseDurationOrPlan(dur, plan) {
+  const hasDur = dur != null && String(dur).trim() !== '';
+  if (!hasDur) return planMs(plan);
+  const ms = parseDuration(dur);
+  if (ms === undefined) return undefined;   // explicit but invalid => caller must reject
+  return ms;                                // explicit valid (null = lifetime)
+}
+
+module.exports = { gen, token, normalize, parseDuration, planMs, parseDurationOrPlan, PLANS };

@@ -33,13 +33,13 @@ function startApi() {
 
   app.post('/api/login', guard, async (req, res) => {
     try { const { key, hwid, user, host, version } = req.body || {}; res.json(await auth.login({ key, hwid, user, host, version, ip: ipOf(req) })); }
-    catch { res.json({ ok: false, error: 'Server error' }); }
+    catch (e) { console.error('[api] login', e); res.json({ ok: false, error: 'Server error', code: 'server_error' }); }
   });
   app.post('/api/session', guard, async (req, res) => {
     try { const { token, hwid } = req.body || {}; res.json(await auth.session({ token, hwid })); }
-    catch { res.json({ ok: false, error: 'Server error' }); }
+    catch (e) { console.error('[api] session', e); res.json({ ok: false, error: 'Server error', code: 'server_error' }); }
   });
-  app.post('/api/logout', async (req, res) => { try { res.json(await auth.logout(req.body || {})); } catch { res.json({ ok: true }); } });
+  app.post('/api/logout', guard, async (req, res) => { try { res.json(await auth.logout(req.body || {})); } catch { res.json({ ok: true }); } });
 
   /* ── Admin ───────────────────────────────────────────── */
   const admin = (req, res, next) => {
@@ -49,7 +49,7 @@ function startApi() {
 
   app.post('/admin/keys', admin, async (req, res) => {
     const { plan = 'month', duration, owner, avatar, note, amount = 1, createdBy } = req.body || {};
-    const ms = duration !== undefined ? keys.parseDuration(duration) : (keys.PLANS[plan] ?? null) * 864e5;
+    const ms = keys.parseDurationOrPlan(duration, plan);
     if (ms === undefined) return res.json({ ok: false, error: 'Bad duration' });
     const created = [];
     for (let i = 0; i < Math.min(50, Math.max(1, amount)); i++) {

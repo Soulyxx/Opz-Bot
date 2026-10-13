@@ -94,7 +94,7 @@ function wire(client) {
         const plan = i.options.getString('plan') || 'month';
         const dur = i.options.getString('duration');
         const owner = i.options.getUser('user');
-        const ms = dur ? keys.parseDuration(dur) : (keys.PLANS[plan] ?? null) * 864e5;
+        const ms = keys.parseDurationOrPlan(dur, plan);
         if (ms === undefined) return i.reply({ content: 'Duración inválida.', ...EP });
 
         const made = [];
